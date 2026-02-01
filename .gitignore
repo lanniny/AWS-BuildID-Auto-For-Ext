@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+
+# 临时文件
+*.log
+*.tmp
+
+# 打包文件
+*.zip
+*.crx
+*.pem
+build/
+dist/
+
+# Node modules (如果使用)
+node_modules/
+
+# 测试文件
+test/
+*.test.js
+
+
+# 独立项目
+kiro-token-pool/
+vscode-extension/
+.kiro/
+
+# CI/CD
+.gitea/

@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "AWS Auto Registration",
+  "version": "1.0.0",
+  "description": "AWS Builder ID 自动注册工具",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "windows"
+  ],
+  "host_permissions": [
+    "https://*.signin.aws/*",
+    "https://*.aws.amazon.com/*",
+    "https://signin.aws.amazon.com/*",
+    "https://*.amazonaws.com/*",
+    "https://mailfly.codeforge.top/*",
+    "https://view.awsapps.com/*"
+  ],
+  "incognito": "spanning",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.signin.aws/*",
+        "https://*.aws.amazon.com/*",
+        "https://signin.aws.amazon.com/*",
+        "https://*.amazonaws.com/*",
+        "https://view.awsapps.com/*"
+      ],
+      "js": [
+        "content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjBvnRiZ3TEc95zNnsui6xZqSL1TfXj1CGTLYhS/4SRgU1o0vUsv3RECCgie0i1s2iBOScsOqaCuOaYth/+twfgz9H1s3tB1od8DCNQNbteZak2iBY6fsff3wVb72TgpRZaPE+vGMr46pmuYRwJxeTXylkCs0e9lYjmjekcQ1gMaWxiUt5f0DGqLs+ZAdqDKJWQJGaRfA4ppyoThVH4cPeQZa97LMAtFyp4sjVKIR0WiQZejvATGqSg0hIEYVzlUh5SVGM1pmvkujnr+u0HiyKdooYoaG9gwfJ46eBHFQGHqL7dNcX28AnRm5QAuLJ6AorRZAAAWlNdDezacSVYgqAQIDAQAB"
+}

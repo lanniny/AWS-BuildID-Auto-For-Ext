@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS Auto Registration</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>AWS 自动注册</h1>
+      <p class="subtitle">Builder ID 一键注册工具</p>
+    </header>
+
+    <!-- 状态显示区域 -->
+    <div id="status-section" class="section">
+      <div class="status-indicator">
+        <span id="status-dot" class="dot idle"></span>
+        <span id="status-text">准备就绪</span>
+        <span id="counter" class="counter" style="display: none;"></span>
+      </div>
+      <div id="step-text" class="step-text"></div>
+    </div>
+
+    <!-- 验证状态提示 -->
+    <div id="validate-section" class="section validate-section" style="display: none;">
+      <div class="validate-info">
+        <span id="validate-text">正在验证...</span>
+      </div>
+    </div>
+
+    <!-- 并发会话状态 -->
+    <div id="sessions-section" class="section" style="display: none;">
+      <h2>运行中的会话</h2>
+      <div id="sessions-list" class="sessions-list"></div>
+    </div>
+
+    <!-- Gmail 配置区域 -->
+    <div id="gmail-section" class="section gmail-section">
+      <div class="section-header">
+        <h2>邮箱配置</h2>
+      </div>
+      <div class="gmail-config">
+        <div class="gmail-input-row">
+          <input type="email" id="gmail-address" placeholder="输入你的 Gmail 地址" class="gmail-input">
+          <button id="gmail-save-btn" class="btn-small">保存</button>
+        </div>
+        <p class="gmail-hint">自动生成别名变体（+号/点号/大小写），验证码需手动填写</p>
+        <p class="gmail-status" id="gmail-status"></p>
+      </div>
+    </div>
+
+    <!-- 设置区域 -->
+    <div id="settings-section" class="section settings-section">
+      <div class="settings-row">
+        <div class="setting-item">
+          <label>注册数量</label>
+          <input type="number" id="loop-count" min="1" max="100" value="1" class="setting-input">
+        </div>
+        <div class="setting-item">
+          <label>并发窗口</label>
+          <input type="number" id="concurrency" min="1" max="3" value="1" class="setting-input">
+        </div>
+      </div>
+      <p class="settings-hint">⚠️ 使用 Gmail 别名模式时，建议并发设为 1</p>
+    </div>
+
+    <!-- 操作按钮区域 -->
+    <div id="action-section" class="section">
+      <button id="start-btn" class="btn btn-primary">开始注册</button>
+      <button id="stop-btn" class="btn btn-danger" style="display: none;">停止</button>
+      <button id="reset-btn" class="btn btn-outline" style="display: none;">重新开始</button>
+    </div>
+
+    <!-- 错误显示 -->
+    <div id="error-section" class="section error-section" style="display: none;">
+      <div class="error-icon">!</div>
+      <div id="error-text" class="error-text"></div>
+    </div>
+
+    <!-- 账号信息区域 -->
+    <div id="account-section" class="section" style="display: none;">
+      <h2>当前账号</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <label>邮箱</label>
+          <div class="info-value">
+            <span id="email-value">-</span>
+            <button class="copy-btn" data-target="email-value" title="复制">复制</button>
+          </div>
+        </div>
+        <div class="info-item">
+          <label>密码</label>
+          <div class="info-value">
+            <span id="password-value">-</span>
+            <button class="copy-btn" data-target="password-value" title="复制">复制</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token 结果区域 -->
+    <div id="token-section" class="section" style="display: none;">
+      <h2>Token</h2>
+      <div class="info-grid">
+        <div class="info-item full-width">
+          <label>Access Token</label>
+          <div class="info-value token-value">
+            <span id="access-token-value" class="token-text">-</span>
+            <button class="copy-btn" data-target="access-token-value" title="复制">复制</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 历史记录区域 -->
+    <div id="history-section" class="section">
+      <div class="section-header">
+        <h2>注册历史</h2>
+        <div class="section-actions">
+          <button id="validate-btn" class="btn-small btn-small-primary" title="验证所有 Token 状态">验证</button>
+          <button id="export-btn" class="btn-small" title="导出有效 Token (JSON)">JSON</button>
+          <button id="export-csv-btn" class="btn-small" title="导出完整信息 (CSV)">CSV</button>
+          <button id="clear-btn" class="btn-small btn-small-danger">清空</button>
+        </div>
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="history-empty">暂无记录</div>
+      </div>
+    </div>
+
+    <!-- Token Pool 集成 -->
+    <div id="token-pool-section" class="section">
+      <div class="section-header">
+        <h2>Token Pool</h2>
+        <div class="section-actions">
+          <button id="pool-upload-btn" class="btn-small btn-small-primary" style="display: none;" title="上传有效 Token 至 Pool">上传</button>
+        </div>
+      </div>
+      <div id="pool-config" class="pool-config">
+        <div class="pool-input-row">
+          <input type="text" id="pool-api-key" placeholder="输入 API Key" class="pool-input">
+          <button id="pool-connect-btn" class="btn-small">连接</button>
+        </div>
+        <p class="pool-hint">在 Token Pool 网站生成 API Key</p>
+      </div>
+      <div id="pool-user-info" class="pool-user-info" style="display: none;">
+        <div class="pool-user-row">
+          <span class="pool-user-name" id="pool-username">-</span>
+          <span class="pool-user-points" id="pool-points">0 积分</span>
+          <button id="pool-disconnect-btn" class="btn-small btn-small-danger">断开</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部信息 -->
+    <footer class="footer">
+      <p>无痕模式需在扩展设置中启用</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
