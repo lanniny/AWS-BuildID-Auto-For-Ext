@@ -530,25 +530,37 @@
   }
 
   /**
-   * 处理姓名页
+   * 处理姓名/邮箱页（AWS enter-email 页面同时需要邮箱和姓名）
    */
   async function handleNamePage() {
-    updateStep('填写姓名...');
-
     const info = await getAccountInfo();
-    if (!info?.fullName) {
-      reportError('无法获取姓名信息');
+    if (!info?.email || !info?.fullName) {
+      reportError('无法获取账号信息');
       return false;
     }
 
+    // 先尝试填写邮箱（如果有邮箱输入框）
+    const emailInput = $('input[placeholder="username@example.com"], input[name="email"], input[type="email"], input[autocomplete="username"], input[autocomplete="email"]');
+    if (emailInput) {
+      updateStep('填写邮箱...');
+      fastFill(emailInput, info.email);
+      console.log('[Content Script] 已填写邮箱:', info.email);
+      await sleep(200);
+    }
+
+    // 再尝试填写姓名（如果有姓名输入框）
     const nameInput = $('input[placeholder="Maria José Silva"], input[placeholder*="name" i], input[name="name"], input[name="fullName"]');
-    if (!nameInput) {
-      console.log('[Content Script] 找不到姓名输入框');
-      return false;
+    if (nameInput) {
+      updateStep('填写姓名...');
+      fastFill(nameInput, info.fullName);
+      console.log('[Content Script] 已填写姓名:', info.fullName);
+      await sleep(200);
     }
 
-    fastFill(nameInput, info.fullName);
-    await sleep(200);
+    if (!emailInput && !nameInput) {
+      console.log('[Content Script] 找不到邮箱或姓名输入框');
+      return false;
+    }
 
     updateStep('点击继续...');
     const btn = $('button[data-testid="signup-next-button"], button[type="submit"], button.awsui-button-variant-primary');
