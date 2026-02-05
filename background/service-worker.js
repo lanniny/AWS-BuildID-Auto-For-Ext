@@ -312,7 +312,7 @@ async function runSessionRegistration(session) {
       throw new Error(`未知的邮箱模式: ${emailServiceConfig.mode}`);
     }
 
-    console.log(`[Session ${session.id}] 账号信息:`, { email, firstName, lastName });
+    console.log(`[Session ${session.id}] 账号信息:`, { email: session.email, firstName, lastName });
 
     // 步骤 3: 获取 OIDC 授权 URL（使用 API 锁）
     updateSession(session.id, { step: '获取授权链接...' });
