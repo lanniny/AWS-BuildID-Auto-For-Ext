@@ -90,6 +90,21 @@ let captchaServiceConfig = {
   solverUrl: 'http://127.0.0.1:5072'
 };
 
+// 代理配置
+let proxyConfig = {
+  enabled: false,
+  rotateMode: 'sequential',
+  proxyList: ''
+};
+
+// 代理配置元素
+const proxyEnabledCheckbox = document.getElementById('proxy-enabled');
+const proxyConfigDiv = document.getElementById('proxy-config');
+const proxyRotateModeSelect = document.getElementById('proxy-rotate-mode');
+const proxyListTextarea = document.getElementById('proxy-list');
+const proxySaveBtn = document.getElementById('proxy-save-btn');
+const proxyStatus = document.getElementById('proxy-status');
+
 // Token Pool 配置
 const POOL_API_URL = 'http://localhost:8080';
 let poolApiKey = '';
@@ -943,6 +958,89 @@ function updateCaptchaStatus(success) {
   }, 3000);
 }
 
+// ==================== 代理配置功能 ====================
+
+/**
+ * 加载代理配置
+ */
+async function loadProxyConfig() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
+    if (response?.proxyConfig) {
+      proxyConfig = { ...proxyConfig, ...response.proxyConfig };
+
+      proxyEnabledCheckbox.checked = proxyConfig.enabled;
+      proxyRotateModeSelect.value = proxyConfig.rotateMode || 'sequential';
+      proxyListTextarea.value = proxyConfig.proxyList || '';
+
+      // 显示/隐藏配置区域
+      proxyConfigDiv.style.display = proxyConfig.enabled ? 'block' : 'none';
+    }
+  } catch (error) {
+    console.error('[Proxy] 加载配置错误:', error);
+  }
+}
+
+/**
+ * 切换代理启用状态
+ */
+function toggleProxyEnabled() {
+  proxyConfig.enabled = proxyEnabledCheckbox.checked;
+  proxyConfigDiv.style.display = proxyConfig.enabled ? 'block' : 'none';
+
+  // 自动保存启用状态
+  saveProxyConfig();
+}
+
+/**
+ * 保存代理配置
+ */
+async function saveProxyConfig() {
+  const proxyList = proxyListTextarea.value.trim();
+  const rotateMode = proxyRotateModeSelect.value;
+
+  // 如果启用了代理但没有配置代理列表
+  if (proxyConfig.enabled && !proxyList) {
+    proxyStatus.textContent = '请输入代理列表';
+    proxyStatus.classList.add('error');
+    return;
+  }
+
+  try {
+    proxyConfig.rotateMode = rotateMode;
+    proxyConfig.proxyList = proxyList;
+
+    await chrome.runtime.sendMessage({
+      type: 'UPDATE_CONFIG',
+      proxyConfig: proxyConfig
+    });
+
+    updateProxyStatus(true);
+  } catch (error) {
+    console.error('[Proxy] 保存配置错误:', error);
+    proxyStatus.textContent = '保存失败: ' + error.message;
+    proxyStatus.classList.add('error');
+  }
+}
+
+/**
+ * 更新代理状态显示
+ */
+function updateProxyStatus(success) {
+  proxyStatus.classList.remove('error', 'success');
+  if (success) {
+    // 显示代理数量
+    const lines = proxyListTextarea.value.split('\n').filter(l => l.trim() && !l.startsWith('#'));
+    proxyStatus.textContent = `✓ 已保存 (${lines.length} 个代理)`;
+    proxyStatus.classList.add('success');
+  } else {
+    proxyStatus.textContent = '';
+  }
+  setTimeout(() => {
+    proxyStatus.textContent = '';
+  }, 3000);
+}
+
 // ==================== Token Pool 功能 ====================
 
 /**
@@ -1137,6 +1235,9 @@ async function init() {
   // 加载 CAPTCHA 配置
   await loadCaptchaConfig();
 
+  // 加载代理配置
+  await loadProxyConfig();
+
   // 加载 Token Pool 配置
   await loadPoolConfig();
 
@@ -1181,6 +1282,10 @@ async function init() {
     updateCaptchaProviderFields(e.target.value);
   });
   captchaSaveBtn.addEventListener('click', saveCaptchaConfig);
+
+  // 代理配置事件
+  proxyEnabledCheckbox.addEventListener('change', toggleProxyEnabled);
+  proxySaveBtn.addEventListener('click', saveProxyConfig);
 
   // Token Pool 事件
   poolConnectBtn.addEventListener('click', connectToPool);

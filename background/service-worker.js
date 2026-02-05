@@ -8,6 +8,7 @@ import { AWSDeviceAuth, validateToken, refreshAndValidateToken } from '../lib/oi
 import { generatePassword, generateName, generateEmailPrefix } from '../lib/utils.js';
 import { EmailService } from '../lib/email-service.js';
 import { CaptchaService } from '../lib/captcha-service.js';
+import { proxyService } from '../lib/proxy-service.js';
 
 // ============== 服务配置 ==============
 
@@ -30,6 +31,13 @@ let captchaServiceConfig = {
   provider: 'yescaptcha', // 'yescaptcha' | '2captcha' | 'capsolver' | 'local'
   apiKey: '',
   solverUrl: 'http://127.0.0.1:5072'
+};
+
+// 代理配置
+let proxyConfig = {
+  enabled: false,
+  rotateMode: 'sequential',
+  proxyList: ''
 };
 
 // ============== 全局状态 ==============
@@ -255,6 +263,18 @@ async function runSessionRegistration(session) {
     session.pollAbort = false;
     updateSession(session.id, { step: '初始化...' });
 
+    // 步骤 0: 应用代理（如果启用）
+    if (proxyConfig.enabled) {
+      const proxy = proxyService.getNextProxy();
+      if (proxy) {
+        updateSession(session.id, { step: `切换代理: ${proxy.host}:${proxy.port}` });
+        await proxyService.applyProxy(proxy);
+        session.usingProxy = proxy;
+        // 等待代理生效
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
     // 步骤 1: 生成账号信息（先生成，用于邮箱前缀）
     updateSession(session.id, { step: '生成账号信息...' });
     const { firstName, lastName } = generateName();
@@ -441,6 +461,12 @@ async function runSessionRegistration(session) {
 
     return false;
   } finally {
+    // 清除代理（如果使用了）
+    if (session.usingProxy) {
+      await proxyService.clearProxy();
+      session.usingProxy = null;
+    }
+
     // 关闭窗口
     if (session.windowId) {
       try {
@@ -925,10 +951,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.captchaService) {
         captchaServiceConfig = { ...captchaServiceConfig, ...message.captchaService };
       }
+      if (message.proxyConfig) {
+        proxyConfig = { ...proxyConfig, ...message.proxyConfig };
+        // 初始化代理服务
+        proxyService.init(proxyConfig);
+      }
       // 保存到 storage
       chrome.storage.local.set({
         emailServiceConfig,
-        captchaServiceConfig
+        captchaServiceConfig,
+        proxyConfig
       });
       sendResponse({ success: true });
       break;
@@ -937,7 +969,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // 获取配置
       sendResponse({
         emailService: emailServiceConfig,
-        captchaService: captchaServiceConfig
+        captchaService: captchaServiceConfig,
+        proxyConfig: proxyConfig
       });
       break;
 
@@ -1090,5 +1123,10 @@ chrome.storage.local.get(['registrationHistory', 'emailServiceConfig', 'captchaS
   if (stored.captchaServiceConfig) {
     captchaServiceConfig = stored.captchaServiceConfig;
     console.log('[Service Worker] 恢复 CAPTCHA 配置:', captchaServiceConfig.enabled ? captchaServiceConfig.provider : '禁用');
+  }
+  if (stored.proxyConfig) {
+    proxyConfig = stored.proxyConfig;
+    proxyService.init(proxyConfig);
+    console.log('[Service Worker] 恢复代理配置:', proxyConfig.enabled ? `${proxyService.getStats().totalProxies} 个代理` : '禁用');
   }
 });

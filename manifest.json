@@ -8,7 +8,8 @@
     "scripting",
     "storage",
     "tabs",
-    "windows"
+    "windows",
+    "proxy"
   ],
   "host_permissions": [
     "https://*.signin.aws/*",

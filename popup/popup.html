@@ -130,6 +130,46 @@
       </div>
     </div>
 
+    <!-- 代理配置区域 -->
+    <div id="proxy-section" class="section proxy-section">
+      <div class="section-header">
+        <h2>代理配置</h2>
+      </div>
+
+      <!-- 代理开关 -->
+      <div class="proxy-toggle">
+        <label class="switch">
+          <input type="checkbox" id="proxy-enabled">
+          <span class="slider"></span>
+        </label>
+        <span>启用代理轮换</span>
+      </div>
+
+      <!-- 代理配置 -->
+      <div id="proxy-config" class="proxy-config" style="display: none;">
+        <div class="input-group">
+          <label>轮换模式</label>
+          <select id="proxy-rotate-mode" class="select-field">
+            <option value="sequential">顺序轮换</option>
+            <option value="random">随机轮换</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>代理列表（每行一个）</label>
+          <textarea id="proxy-list" class="textarea-field" rows="4" placeholder="格式示例:
+host:port
+host:port:username:password
+http://host:port
+socks5://user:pass@host:port"></textarea>
+        </div>
+
+        <button id="proxy-save-btn" class="btn-small btn-small-primary">保存配置</button>
+        <p class="config-hint">每次注册会自动切换代理，降低封禁风险</p>
+        <p class="config-status" id="proxy-status"></p>
+      </div>
+    </div>
+
     <!-- 设置区域 -->
     <div id="settings-section" class="section settings-section">
       <div class="settings-row">
