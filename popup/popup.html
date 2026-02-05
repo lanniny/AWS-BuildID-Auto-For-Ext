@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AWS Auto Registration</title>
   <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="popup-config.css">
 </head>
 <body>
   <div class="container">
@@ -36,18 +37,96 @@
       <div id="sessions-list" class="sessions-list"></div>
     </div>
 
-    <!-- Gmail 配置区域 -->
-    <div id="gmail-section" class="section gmail-section">
+    <!-- 邮箱配置区域 -->
+    <div id="email-section" class="section email-section">
       <div class="section-header">
         <h2>邮箱配置</h2>
       </div>
-      <div class="gmail-config">
-        <div class="gmail-input-row">
-          <input type="email" id="gmail-address" placeholder="输入你的 Gmail 地址" class="gmail-input">
+
+      <!-- 邮箱模式选择 -->
+      <div class="email-mode-selector">
+        <label class="radio-label">
+          <input type="radio" name="email-mode" value="gmail" checked>
+          <span>Gmail 别名</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="email-mode" value="temp">
+          <span>临时邮箱</span>
+        </label>
+      </div>
+
+      <!-- Gmail 配置 -->
+      <div id="gmail-config" class="email-config">
+        <div class="input-row">
+          <input type="email" id="gmail-address" placeholder="输入你的 Gmail 地址" class="input-field">
           <button id="gmail-save-btn" class="btn-small">保存</button>
         </div>
-        <p class="gmail-hint">自动生成别名变体（+号/点号/大小写），验证码需手动填写</p>
-        <p class="gmail-status" id="gmail-status"></p>
+        <p class="config-hint">自动生成别名变体（+号/点号/大小写），验证码需手动填写</p>
+        <p class="config-status" id="gmail-status"></p>
+      </div>
+
+      <!-- 临时邮箱配置 -->
+      <div id="temp-email-config" class="email-config" style="display: none;">
+        <div class="input-group">
+          <label>Worker Domain</label>
+          <input type="text" id="temp-worker-domain" placeholder="例: mailfly.codeforge.top" class="input-field">
+        </div>
+        <div class="input-group">
+          <label>Email Domain</label>
+          <input type="text" id="temp-email-domain" placeholder="例: example.com" class="input-field">
+        </div>
+        <div class="input-group">
+          <label>Admin Password</label>
+          <input type="password" id="temp-admin-password" placeholder="管理员密码" class="input-field">
+        </div>
+        <button id="temp-email-save-btn" class="btn-small btn-small-primary">保存配置</button>
+        <p class="config-hint">临时邮箱模式支持自动获取验证码，无需手动填写</p>
+        <p class="config-status" id="temp-email-status"></p>
+      </div>
+    </div>
+
+    <!-- CAPTCHA 配置区域 -->
+    <div id="captcha-section" class="section captcha-section">
+      <div class="section-header">
+        <h2>CAPTCHA 配置</h2>
+      </div>
+
+      <!-- CAPTCHA 开关 -->
+      <div class="captcha-toggle">
+        <label class="switch">
+          <input type="checkbox" id="captcha-enabled">
+          <span class="slider"></span>
+        </label>
+        <span>启用 CAPTCHA 自动解决</span>
+      </div>
+
+      <!-- CAPTCHA 服务商选择 -->
+      <div id="captcha-config" class="captcha-config" style="display: none;">
+        <div class="input-group">
+          <label>服务商</label>
+          <select id="captcha-provider" class="select-field">
+            <option value="yescaptcha">YesCaptcha</option>
+            <option value="2captcha">2Captcha</option>
+            <option value="capsolver">CapSolver</option>
+            <option value="local">本地 Solver</option>
+          </select>
+        </div>
+
+        <!-- API Key 配置（本地 Solver 不需要） -->
+        <div id="captcha-api-key-group" class="input-group">
+          <label>API Key</label>
+          <input type="password" id="captcha-api-key" placeholder="输入 API Key" class="input-field">
+        </div>
+
+        <!-- 本地 Solver URL 配置 -->
+        <div id="captcha-solver-url-group" class="input-group" style="display: none;">
+          <label>Solver URL</label>
+          <input type="text" id="captcha-solver-url" placeholder="http://127.0.0.1:5072" class="input-field" value="http://127.0.0.1:5072">
+        </div>
+
+        <button id="captcha-save-btn" class="btn-small btn-small-primary">保存配置</button>
+        <p class="config-hint">CAPTCHA 服务用于自动解决验证码（如果 AWS 有验证码）</p>
+        <p class="config-status" id="captcha-status"></p>
       </div>
     </div>
 
@@ -63,7 +142,7 @@
           <input type="number" id="concurrency" min="1" max="3" value="1" class="setting-input">
         </div>
       </div>
-      <p class="settings-hint">⚠️ 使用 Gmail 别名模式时，建议并发设为 1</p>
+      <p class="settings-hint">⚠️ 使用 Gmail 别名模式时，建议并发设为 1；临时邮箱模式支持更高并发</p>
     </div>
 
     <!-- 操作按钮区域 -->

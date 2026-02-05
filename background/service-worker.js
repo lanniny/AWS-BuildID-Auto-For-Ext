@@ -6,9 +6,31 @@
 import { GmailAliasClient } from '../lib/mail-api.js';
 import { AWSDeviceAuth, validateToken, refreshAndValidateToken } from '../lib/oidc-api.js';
 import { generatePassword, generateName, generateEmailPrefix } from '../lib/utils.js';
+import { EmailService } from '../lib/email-service.js';
+import { CaptchaService } from '../lib/captcha-service.js';
 
-// Gmail 配置
-let gmailBaseAddress = '';
+// ============== 服务配置 ==============
+
+// 邮箱服务配置
+let emailServiceConfig = {
+  mode: 'gmail', // 'gmail' | 'temp'
+  // Gmail 模式配置
+  gmailBaseAddress: '',
+  // 临时邮箱模式配置
+  tempEmail: {
+    workerDomain: '',
+    emailDomain: '',
+    adminPassword: ''
+  }
+};
+
+// CAPTCHA 服务配置
+let captchaServiceConfig = {
+  enabled: false,
+  provider: 'yescaptcha', // 'yescaptcha' | '2captcha' | 'capsolver' | 'local'
+  apiKey: '',
+  solverUrl: 'http://127.0.0.1:5072'
+};
 
 // ============== 全局状态 ==============
 
@@ -241,26 +263,54 @@ async function runSessionRegistration(session) {
     session.lastName = lastName;
     session.password = password;
 
-    // 步骤 2: 生成 Gmail 别名邮箱
-    updateSession(session.id, { step: '生成邮箱别名...' });
-    
-    if (!gmailBaseAddress) {
-      throw new Error('未配置 Gmail 地址，请在插件设置中配置');
+    // 步骤 2: 生成邮箱（Gmail 别名 或 临时邮箱）
+    updateSession(session.id, { step: '生成邮箱...' });
+
+    if (emailServiceConfig.mode === 'gmail') {
+      // Gmail 别名模式
+      if (!emailServiceConfig.gmailBaseAddress) {
+        throw new Error('未配置 Gmail 地址，请在插件设置中配置');
+      }
+
+      session.mailClient = new GmailAliasClient({ baseEmail: emailServiceConfig.gmailBaseAddress });
+
+      // 自动生成邮箱变体（+号/点号/大小写组合）
+      const nameSuffix = `${firstName.toLowerCase()}${lastName.toLowerCase()}`.slice(0, 8);
+
+      const email = await session.mailClient.createInbox({
+        prefix: nameSuffix,
+        mode: 'auto'
+      });
+      session.email = email;
+      session.manualVerification = true; // 标记需要手动输入验证码
+      updateSession(session.id, { email });
+
+    } else if (emailServiceConfig.mode === 'temp') {
+      // 临时邮箱模式
+      const { workerDomain, emailDomain, adminPassword } = emailServiceConfig.tempEmail;
+
+      if (!workerDomain || !emailDomain || !adminPassword) {
+        throw new Error('临时邮箱配置不完整，请在插件设置中配置');
+      }
+
+      session.emailService = new EmailService({
+        workerDomain,
+        emailDomain,
+        adminPassword,
+        timeout: 10000,
+        maxRetries: 3
+      });
+
+      const { jwt, email } = await withApiLock(() => session.emailService.createEmail());
+      session.email = email;
+      session.emailJwt = jwt;
+      session.manualVerification = false; // 自动获取验证码
+      updateSession(session.id, { email });
+
+      console.log(`[Session ${session.id}] 临时邮箱创建成功: ${email}`);
+    } else {
+      throw new Error(`未知的邮箱模式: ${emailServiceConfig.mode}`);
     }
-    
-    session.mailClient = new GmailAliasClient({ baseEmail: gmailBaseAddress });
-
-    // 自动生成邮箱变体（+号/点号/大小写组合）
-    // 可选后缀包含姓名信息，便于识别
-    const nameSuffix = `${firstName.toLowerCase()}${lastName.toLowerCase()}`.slice(0, 8);
-
-    const email = await session.mailClient.createInbox({
-      prefix: nameSuffix,  // 可选的姓名后缀
-      mode: 'auto'         // 自动轮换变体方式
-    });
-    session.email = email;
-    session.manualVerification = true; // 标记需要手动输入验证码
-    updateSession(session.id, { email });
 
     console.log(`[Session ${session.id}] 账号信息:`, { email, firstName, lastName });
 
@@ -607,18 +657,30 @@ async function validateAllTokens() {
 /**
  * 开始批量注册
  */
-async function startBatchRegistration(loopCount, concurrency, gmailAddress) {
+async function startBatchRegistration(loopCount, concurrency, config) {
   if (isRunning) {
     return { success: false, error: '已有注册任务在运行' };
   }
 
-  // 检查 Gmail 配置
-  if (!gmailAddress) {
-    return { success: false, error: '未配置 Gmail 地址' };
+  // 更新服务配置
+  if (config.emailService) {
+    emailServiceConfig = { ...emailServiceConfig, ...config.emailService };
   }
-  
-  // 设置全局 Gmail 地址
-  gmailBaseAddress = gmailAddress;
+  if (config.captchaService) {
+    captchaServiceConfig = { ...captchaServiceConfig, ...config.captchaService };
+  }
+
+  // 验证邮箱配置
+  if (emailServiceConfig.mode === 'gmail') {
+    if (!emailServiceConfig.gmailBaseAddress) {
+      return { success: false, error: '未配置 Gmail 地址' };
+    }
+  } else if (emailServiceConfig.mode === 'temp') {
+    const { workerDomain, emailDomain, adminPassword } = emailServiceConfig.tempEmail;
+    if (!workerDomain || !emailDomain || !adminPassword) {
+      return { success: false, error: '临时邮箱配置不完整' };
+    }
+  }
 
   isRunning = true;
   shouldStop = false;
@@ -638,7 +700,7 @@ async function startBatchRegistration(loopCount, concurrency, gmailAddress) {
   sessions.clear();
   broadcastState();
 
-  console.log(`[Service Worker] 开始批量注册: 目标=${loopCount}, 并发=${concurrency}, Gmail=${gmailAddress}`);
+  console.log(`[Service Worker] 开始批量注册: 目标=${loopCount}, 并发=${concurrency}, 邮箱模式=${emailServiceConfig.mode}`);
 
   // 创建任务队列
   taskQueue = [];
@@ -773,27 +835,57 @@ function findSessionByWindowId(windowId) {
 }
 
 /**
- * 获取验证码（Gmail 别名模式 - 等待用户手动输入）
+ * 获取验证码（自动或手动）
  */
 async function getVerificationCode(session) {
   if (!session) {
     return { success: false, error: '会话未初始化' };
   }
 
-  // Gmail 别名模式下，需要用户手动输入验证码
-  // 返回特殊标记，让 content script 知道需要等待用户输入
+  // 如果是临时邮箱模式，自动获取验证码
+  if (emailServiceConfig.mode === 'temp' && session.emailService && session.emailJwt) {
+    console.log(`[Session ${session.id}] 临时邮箱模式，自动获取验证码`);
+
+    try {
+      // 等待邮件到达（最多 60 秒）
+      updateSession(session.id, { step: '等待验证码邮件...' });
+      const emailContent = await session.emailService.waitForEmail(session.emailJwt, 60000, 2000);
+
+      if (!emailContent) {
+        return { success: false, error: '等待验证码邮件超时' };
+      }
+
+      // 提取验证码（AWS 验证码通常是 6 位数字）
+      const code = session.emailService.extractVerificationCode(emailContent, /\b\d{6}\b/);
+
+      if (!code) {
+        console.error(`[Session ${session.id}] 邮件内容中未找到验证码`);
+        return { success: false, error: '邮件中未找到验证码' };
+      }
+
+      console.log(`[Session ${session.id}] 验证码获取成功: ${code}`);
+      session.verificationCode = code;
+      return { success: true, code };
+
+    } catch (error) {
+      console.error(`[Session ${session.id}] 获取验证码失败:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Gmail 别名模式，需要用户手动输入验证码
   console.log(`[Session ${session.id}] Gmail 别名模式，等待用户手动输入验证码`);
-  
+
   // 如果会话中已经有验证码（用户已输入），则返回
   if (session.verificationCode) {
     return { success: true, code: session.verificationCode };
   }
-  
+
   // 返回需要手动输入的标记
-  return { 
-    success: false, 
-    needManualInput: true, 
-    error: '请从 Gmail 收件箱获取验证码并手动填写' 
+  return {
+    success: false,
+    needManualInput: true,
+    error: '请从 Gmail 收件箱获取验证码并手动填写'
   };
 }
 
@@ -819,9 +911,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'START_BATCH_REGISTRATION':
-      startBatchRegistration(message.loopCount || 1, message.concurrency || 1, message.gmailAddress)
+      startBatchRegistration(message.loopCount || 1, message.concurrency || 1, message.config || {})
         .then(sendResponse);
       return true;
+
+    case 'UPDATE_CONFIG':
+      // 更新配置
+      if (message.emailService) {
+        emailServiceConfig = { ...emailServiceConfig, ...message.emailService };
+      }
+      if (message.captchaService) {
+        captchaServiceConfig = { ...captchaServiceConfig, ...message.captchaService };
+      }
+      // 保存到 storage
+      chrome.storage.local.set({
+        emailServiceConfig,
+        captchaServiceConfig
+      });
+      sendResponse({ success: true });
+      break;
+
+    case 'GET_CONFIG':
+      // 获取配置
+      sendResponse({
+        emailService: emailServiceConfig,
+        captchaService: captchaServiceConfig
+      });
+      break;
 
     case 'STOP_REGISTRATION':
       stopRegistration();
@@ -959,10 +1075,18 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('[Service Worker] 扩展已安装/更新');
 });
 
-// 恢复历史记录
-chrome.storage.local.get(['registrationHistory']).then((stored) => {
+// 恢复历史记录和配置
+chrome.storage.local.get(['registrationHistory', 'emailServiceConfig', 'captchaServiceConfig']).then((stored) => {
   if (stored.registrationHistory) {
     registrationHistory = stored.registrationHistory;
     console.log('[Service Worker] 恢复历史记录:', registrationHistory.length, '条');
+  }
+  if (stored.emailServiceConfig) {
+    emailServiceConfig = stored.emailServiceConfig;
+    console.log('[Service Worker] 恢复邮箱配置:', emailServiceConfig.mode);
+  }
+  if (stored.captchaServiceConfig) {
+    captchaServiceConfig = stored.captchaServiceConfig;
+    console.log('[Service Worker] 恢复 CAPTCHA 配置:', captchaServiceConfig.enabled ? captchaServiceConfig.provider : '禁用');
   }
 });

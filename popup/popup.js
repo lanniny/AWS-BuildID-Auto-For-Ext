@@ -37,10 +37,29 @@ const validateBtn = document.getElementById('validate-btn');
 const validateSection = document.getElementById('validate-section');
 const validateText = document.getElementById('validate-text');
 
-// Gmail 配置元素
+// 邮箱配置元素
+const emailModeRadios = document.querySelectorAll('input[name="email-mode"]');
+const gmailConfig = document.getElementById('gmail-config');
+const tempEmailConfig = document.getElementById('temp-email-config');
 const gmailAddressInput = document.getElementById('gmail-address');
 const gmailSaveBtn = document.getElementById('gmail-save-btn');
 const gmailStatus = document.getElementById('gmail-status');
+const tempWorkerDomainInput = document.getElementById('temp-worker-domain');
+const tempEmailDomainInput = document.getElementById('temp-email-domain');
+const tempAdminPasswordInput = document.getElementById('temp-admin-password');
+const tempEmailSaveBtn = document.getElementById('temp-email-save-btn');
+const tempEmailStatus = document.getElementById('temp-email-status');
+
+// CAPTCHA 配置元素
+const captchaEnabledCheckbox = document.getElementById('captcha-enabled');
+const captchaConfig = document.getElementById('captcha-config');
+const captchaProviderSelect = document.getElementById('captcha-provider');
+const captchaApiKeyInput = document.getElementById('captcha-api-key');
+const captchaApiKeyGroup = document.getElementById('captcha-api-key-group');
+const captchaSolverUrlInput = document.getElementById('captcha-solver-url');
+const captchaSolverUrlGroup = document.getElementById('captcha-solver-url-group');
+const captchaSaveBtn = document.getElementById('captcha-save-btn');
+const captchaStatus = document.getElementById('captcha-status');
 
 // Token Pool 元素
 const poolApiKeyInput = document.getElementById('pool-api-key');
@@ -52,8 +71,24 @@ const poolUserInfo = document.getElementById('pool-user-info');
 const poolUsername = document.getElementById('pool-username');
 const poolPoints = document.getElementById('pool-points');
 
-// Gmail 配置
-let gmailAddress = '';
+// 邮箱配置
+let emailServiceConfig = {
+  mode: 'gmail',
+  gmailBaseAddress: '',
+  tempEmail: {
+    workerDomain: '',
+    emailDomain: '',
+    adminPassword: ''
+  }
+};
+
+// CAPTCHA 配置
+let captchaServiceConfig = {
+  enabled: false,
+  provider: 'yescaptcha',
+  apiKey: '',
+  solverUrl: 'http://127.0.0.1:5072'
+};
 
 // Token Pool 配置
 const POOL_API_URL = 'http://localhost:8080';
@@ -651,22 +686,57 @@ async function validateAllTokens() {
   }
 }
 
-// ==================== Gmail 配置功能 ====================
+// ==================== 邮箱配置功能 ====================
 
 /**
- * 加载 Gmail 配置
+ * 加载邮箱配置
  */
-async function loadGmailConfig() {
+async function loadEmailConfig() {
   try {
-    const result = await chrome.storage.local.get(['gmailAddress']);
-    if (result.gmailAddress) {
-      gmailAddress = result.gmailAddress;
-      gmailAddressInput.value = gmailAddress;
-      updateGmailStatus(true);
+    const response = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
+    if (response?.emailService) {
+      emailServiceConfig = response.emailService;
+
+      // 设置邮箱模式
+      const modeRadio = document.querySelector(`input[name="email-mode"][value="${emailServiceConfig.mode}"]`);
+      if (modeRadio) {
+        modeRadio.checked = true;
+        switchEmailMode(emailServiceConfig.mode);
+      }
+
+      // 加载 Gmail 配置
+      if (emailServiceConfig.gmailBaseAddress) {
+        gmailAddressInput.value = emailServiceConfig.gmailBaseAddress;
+        updateGmailStatus(true);
+      }
+
+      // 加载临时邮箱配置
+      if (emailServiceConfig.tempEmail) {
+        tempWorkerDomainInput.value = emailServiceConfig.tempEmail.workerDomain || '';
+        tempEmailDomainInput.value = emailServiceConfig.tempEmail.emailDomain || '';
+        tempAdminPasswordInput.value = emailServiceConfig.tempEmail.adminPassword || '';
+        if (emailServiceConfig.tempEmail.workerDomain) {
+          updateTempEmailStatus(true);
+        }
+      }
     }
   } catch (error) {
-    console.error('[Gmail] 加载配置错误:', error);
+    console.error('[Email] 加载配置错误:', error);
   }
+}
+
+/**
+ * 切换邮箱模式
+ */
+function switchEmailMode(mode) {
+  if (mode === 'gmail') {
+    gmailConfig.style.display = 'block';
+    tempEmailConfig.style.display = 'none';
+  } else if (mode === 'temp') {
+    gmailConfig.style.display = 'none';
+    tempEmailConfig.style.display = 'block';
+  }
+  emailServiceConfig.mode = mode;
 }
 
 /**
@@ -674,28 +744,62 @@ async function loadGmailConfig() {
  */
 async function saveGmailConfig() {
   const email = gmailAddressInput.value.trim();
-  
+
   if (!email) {
     gmailStatus.textContent = '请输入邮箱地址';
     gmailStatus.classList.add('error');
     return;
   }
-  
-  // 验证邮箱格式
+
   if (!email.includes('@')) {
     gmailStatus.textContent = '邮箱格式无效';
     gmailStatus.classList.add('error');
     return;
   }
-  
+
   try {
-    gmailAddress = email;
-    await chrome.storage.local.set({ gmailAddress: email });
+    emailServiceConfig.gmailBaseAddress = email;
+    await chrome.runtime.sendMessage({
+      type: 'UPDATE_CONFIG',
+      emailService: emailServiceConfig
+    });
     updateGmailStatus(true);
   } catch (error) {
     console.error('[Gmail] 保存配置错误:', error);
     gmailStatus.textContent = '保存失败: ' + error.message;
     gmailStatus.classList.add('error');
+  }
+}
+
+/**
+ * 保存临时邮箱配置
+ */
+async function saveTempEmailConfig() {
+  const workerDomain = tempWorkerDomainInput.value.trim();
+  const emailDomain = tempEmailDomainInput.value.trim();
+  const adminPassword = tempAdminPasswordInput.value.trim();
+
+  if (!workerDomain || !emailDomain || !adminPassword) {
+    tempEmailStatus.textContent = '请填写完整配置';
+    tempEmailStatus.classList.add('error');
+    return;
+  }
+
+  try {
+    emailServiceConfig.tempEmail = {
+      workerDomain,
+      emailDomain,
+      adminPassword
+    };
+    await chrome.runtime.sendMessage({
+      type: 'UPDATE_CONFIG',
+      emailService: emailServiceConfig
+    });
+    updateTempEmailStatus(true);
+  } catch (error) {
+    console.error('[TempEmail] 保存配置错误:', error);
+    tempEmailStatus.textContent = '保存失败: ' + error.message;
+    tempEmailStatus.classList.add('error');
   }
 }
 
@@ -710,6 +814,122 @@ function updateGmailStatus(saved) {
     gmailStatus.textContent = '';
     gmailStatus.classList.remove('error');
   }
+}
+
+/**
+ * 更新临时邮箱状态显示
+ */
+function updateTempEmailStatus(success) {
+  tempEmailStatus.classList.remove('error', 'success');
+  if (success) {
+    tempEmailStatus.textContent = '✓ 已保存';
+    tempEmailStatus.classList.add('success');
+  } else {
+    tempEmailStatus.textContent = '';
+  }
+  setTimeout(() => {
+    tempEmailStatus.textContent = '';
+  }, 3000);
+}
+
+/**
+ * 加载 CAPTCHA 配置
+ */
+async function loadCaptchaConfig() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
+    if (response?.captchaService) {
+      captchaServiceConfig = response.captchaService;
+
+      // 设置开关状态
+      captchaEnabledCheckbox.checked = captchaServiceConfig.enabled;
+      captchaConfig.style.display = captchaServiceConfig.enabled ? 'block' : 'none';
+
+      // 设置服务商
+      captchaProviderSelect.value = captchaServiceConfig.provider;
+      updateCaptchaProviderFields(captchaServiceConfig.provider);
+
+      // 设置 API Key
+      if (captchaServiceConfig.apiKey) {
+        captchaApiKeyInput.value = captchaServiceConfig.apiKey;
+      }
+
+      // 设置 Solver URL
+      if (captchaServiceConfig.solverUrl) {
+        captchaSolverUrlInput.value = captchaServiceConfig.solverUrl;
+      }
+    }
+  } catch (error) {
+    console.error('[CAPTCHA] 加载配置错误:', error);
+  }
+}
+
+/**
+ * 切换 CAPTCHA 服务商时更新字段显示
+ */
+function updateCaptchaProviderFields(provider) {
+  if (provider === 'local') {
+    captchaApiKeyGroup.style.display = 'none';
+    captchaSolverUrlGroup.style.display = 'block';
+  } else {
+    captchaApiKeyGroup.style.display = 'block';
+    captchaSolverUrlGroup.style.display = 'none';
+  }
+}
+
+/**
+ * 保存 CAPTCHA 配置
+ */
+async function saveCaptchaConfig() {
+  const provider = captchaProviderSelect.value;
+  const apiKey = captchaApiKeyInput.value.trim();
+  const solverUrl = captchaSolverUrlInput.value.trim();
+
+  // 验证配置
+  if (provider !== 'local' && !apiKey) {
+    captchaStatus.textContent = '请输入 API Key';
+    captchaStatus.classList.add('error');
+    return;
+  }
+
+  if (provider === 'local' && !solverUrl) {
+    captchaStatus.textContent = '请输入 Solver URL';
+    captchaStatus.classList.add('error');
+    return;
+  }
+
+  try {
+    captchaServiceConfig.provider = provider;
+    captchaServiceConfig.apiKey = apiKey;
+    captchaServiceConfig.solverUrl = solverUrl;
+
+    await chrome.runtime.sendMessage({
+      type: 'UPDATE_CONFIG',
+      captchaService: captchaServiceConfig
+    });
+
+    updateCaptchaStatus(true);
+  } catch (error) {
+    console.error('[CAPTCHA] 保存配置错误:', error);
+    captchaStatus.textContent = '保存失败: ' + error.message;
+    captchaStatus.classList.add('error');
+  }
+}
+
+/**
+ * 更新 CAPTCHA 状态显示
+ */
+function updateCaptchaStatus(success) {
+  captchaStatus.classList.remove('error', 'success');
+  if (success) {
+    captchaStatus.textContent = '✓ 已保存';
+    captchaStatus.classList.add('success');
+  } else {
+    captchaStatus.textContent = '';
+  }
+  setTimeout(() => {
+    captchaStatus.textContent = '';
+  }, 3000);
 }
 
 // ==================== Token Pool 功能 ====================
@@ -900,8 +1120,11 @@ async function init() {
     console.error('[Popup] 获取状态错误:', error);
   }
 
-  // 加载 Gmail 配置
-  await loadGmailConfig();
+  // 加载邮箱配置
+  await loadEmailConfig();
+
+  // 加载 CAPTCHA 配置
+  await loadCaptchaConfig();
 
   // 加载 Token Pool 配置
   await loadPoolConfig();
@@ -922,13 +1145,31 @@ async function init() {
   clearBtn.addEventListener('click', clearHistory);
   validateBtn.addEventListener('click', validateAllTokens);
 
-  // Gmail 配置事件
+  // 邮箱配置事件
+  emailModeRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => switchEmailMode(e.target.value));
+  });
   gmailSaveBtn.addEventListener('click', saveGmailConfig);
   gmailAddressInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       saveGmailConfig();
     }
   });
+  tempEmailSaveBtn.addEventListener('click', saveTempEmailConfig);
+
+  // CAPTCHA 配置事件
+  captchaEnabledCheckbox.addEventListener('change', (e) => {
+    captchaServiceConfig.enabled = e.target.checked;
+    captchaConfig.style.display = e.target.checked ? 'block' : 'none';
+    chrome.runtime.sendMessage({
+      type: 'UPDATE_CONFIG',
+      captchaService: captchaServiceConfig
+    });
+  });
+  captchaProviderSelect.addEventListener('change', (e) => {
+    updateCaptchaProviderFields(e.target.value);
+  });
+  captchaSaveBtn.addEventListener('click', saveCaptchaConfig);
 
   // Token Pool 事件
   poolConnectBtn.addEventListener('click', connectToPool);

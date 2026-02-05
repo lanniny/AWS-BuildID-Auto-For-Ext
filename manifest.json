@@ -16,7 +16,12 @@
     "https://signin.aws.amazon.com/*",
     "https://*.amazonaws.com/*",
     "https://mailfly.codeforge.top/*",
-    "https://view.awsapps.com/*"
+    "https://view.awsapps.com/*",
+    "https://api.yescaptcha.com/*",
+    "https://2captcha.com/*",
+    "https://api.capsolver.com/*",
+    "http://127.0.0.1:5072/*",
+    "http://localhost:5072/*"
   ],
   "incognito": "spanning",
   "action": {

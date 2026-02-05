@@ -347,27 +347,34 @@
   }
 
   /**
-   * 获取验证码（Gmail 别名模式 - 等待用户手动输入）
+   * 获取验证码（自动或手动）
    */
   async function getVerificationCode() {
     if (verificationCode) {
       return verificationCode;
     }
 
-    updateStep('请手动填写验证码（从 Gmail 收件箱获取）');
-
     try {
       const response = await chrome.runtime.sendMessage({ type: 'GET_VERIFICATION_CODE' });
       if (response && response.success) {
         verificationCode = response.code;
         console.log('[Content Script] 获取到验证码:', verificationCode);
+        updateStep('验证码已自动获取');
         return verificationCode;
       }
-      
+
       // Gmail 别名模式，需要用户手动输入
       if (response && response.needManualInput) {
-        console.log('[Content Script] Gmail 别名模式，等待用户手动输入验证码');
+        console.log('[Content Script] Gmail 别名模式，等待用户手动输��验证码');
+        updateStep('请手动填写验证码（从 Gmail 收件箱获取）');
         return null; // 返回 null 表示需要手动输入
+      }
+
+      // 临时邮箱模式，自动获取失败
+      if (response && !response.success) {
+        console.error('[Content Script] 自动获取验证码失败:', response.error);
+        updateStep(`验证码获取失败: ${response.error}`);
+        return null;
       }
     } catch (e) {
       console.error('[Content Script] 获取验证码失败:', e);

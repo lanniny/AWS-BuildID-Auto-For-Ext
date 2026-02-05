@@ -15,7 +15,9 @@
 
 ---
 
-> ⚠️ **重要提示**：目前插件的**并发多窗口功能不稳定**，建议将并发窗口数设置为 **1**。使用 Gmail 别名模式时需要手动填写验证码。
+> ⚠️ **重要提示**：目前插件的**并发多窗口功能不稳定**，建议将并发窗口数设置为 **1**。
+>
+> 🎉 **新功能**：现已支持**临时邮箱服务**和 **CAPTCHA 自动解决**，实现完全自动化注册！
 
 ---
 
@@ -23,11 +25,12 @@
 
 ### 🎯 核心功能
 
-- **🤖 半自动注册** - 自动填写表单，验证码需手动输入
+- **🤖 完全自动化** - 支持临时邮箱 + CAPTCHA 自动解决，无需人工干预
 - **🔄 批量注册** - 支持自定义注册数量（1-100），一键批量创建账号
-- **📧 Gmail 无限别名** - 利用 Gmail 特性生成无限邮箱变体（+号/点号/大小写）
+- **📧 双邮箱模式** - Gmail 别名（手动验证码）或临时邮箱（自动验证码）
 - **🕵️ 无痕模式** - 自动创建无痕窗口，隔离会话，防止数据污染
 - **🔐 Token 管理** - 自动获取并保存 OIDC Access Token 和 Refresh Token
+- **🔓 CAPTCHA 解决** - 支持 YesCaptcha、2Captcha、CapSolver、本地 Solver
 
 ### 🛡️ 高级功能
 
@@ -39,9 +42,11 @@
 
 ---
 
-## 📧 Gmail 无限别名
+## 📧 邮箱服务
 
-本插件利用 Gmail 的特性，从一个 Gmail 地址生成无限邮箱变体：
+### 模式一：Gmail 别名（半自动）
+
+利用 Gmail 的特性，从一个 Gmail 地址生成无限邮箱变体：
 
 | 变体类型 | 示例 | 说明 |
 |---------|------|------|
@@ -50,7 +55,38 @@
 | **大小写变体** | `UsEr@gmail.com` | Gmail 不区分大小写 |
 | **混合变体** | `U.sEr+abc@gmail.com` | 组合以上所有方式 |
 
-> 所有变体都会收到同一个 Gmail 收件箱的邮件
+> 所有变体都会收到同一个 Gmail 收件箱的邮件，**需要手动填写验证码**
+
+### 模式二：临时邮箱（完全自动）
+
+集成临时邮箱服务，支持自动获取验证码：
+
+- **自动创建邮箱** - 无需预先准备邮箱地址
+- **自动获取验证码** - 轮询邮件内容，自动提取验证码
+- **完全自动化** - 无需人工干预，实现真正的批量注册
+
+**配置要求**：
+- Worker Domain（邮箱服务域名）
+- Email Domain（邮箱后缀域名）
+- Admin Password（管理员密码）
+
+---
+
+## 🔓 CAPTCHA 自动解决
+
+支持多个 CAPTCHA 服务商，自动解决验证码：
+
+| 服务商 | 类型 | 说明 |
+|--------|------|------|
+| **YesCaptcha** | 云服务 | 支持 Turnstile、hCaptcha、reCAPTCHA |
+| **2Captcha** | 云服务 | 老牌服务商，稳定可靠 |
+| **CapSolver** | 云服务 | 高性能 CAPTCHA 解决方案 |
+| **本地 Solver** | 本地服务 | 自建 Solver，无需 API Key |
+
+**使用步骤**：
+1. 在插件设置中启用 CAPTCHA 自动解决
+2. 选择服务商并配置 API Key（本地 Solver 无需）
+3. 保存配置后即可自动解决 CAPTCHA
 
 ---
 
@@ -85,7 +121,7 @@ cd AWS-BuildID-Auto-For-Ext
 
 ## 📖 使用说明
 
-### 快速开始
+### 快速开始（Gmail 别名模式）
 
 1. **配置 Gmail 地址**：在插件弹窗中输入你的 Gmail 地址并保存
 2. **设置参数**：
@@ -97,15 +133,51 @@ cd AWS-BuildID-Auto-For-Ext
    - 在注册页面手动输入验证码
 5. **等待完成**，查看注册结果
 
+### 快速开始（临时邮箱模式 - 完全自动）
+
+1. **配置临时邮箱服务**：
+   - 选择「临时邮箱」模式
+   - 填写 Worker Domain、Email Domain、Admin Password
+   - 点击「保存配置」
+2. **（可选）配置 CAPTCHA 服务**：
+   - 启用 CAPTCHA 自动解决
+   - 选择服务商并填写 API Key
+   - 点击「保存配置」
+3. **设置参数**：
+   - 注册数量：1-100
+   - 并发窗口：临时邮箱模式支持更高并发（1-3）
+4. **点击「开始注册」**
+5. **完全自动化**，无需人工干预，等待完成即可
+
 ### 功能详解
 
-#### 📧 Gmail 配置
+#### 📧 邮箱配置
 
-在插件弹窗顶部配置你的 Gmail 地址：
-
+**Gmail 别名模式**：
 ```
 输入: example@gmail.com
 保存后自动生成变体: example+240204abc@gmail.com, e.xample@gmail.com 等
+```
+
+**临时邮箱模式**：
+```
+Worker Domain: mailfly.codeforge.top
+Email Domain: example.com
+Admin Password: your-admin-password
+```
+
+#### 🔓 CAPTCHA 配置
+
+**YesCaptcha / 2Captcha / CapSolver**：
+```
+服务商: YesCaptcha
+API Key: your-api-key-here
+```
+
+**本地 Solver**：
+```
+服务商: 本地 Solver
+Solver URL: http://127.0.0.1:5072
 ```
 
 #### ✅ Token 验证
@@ -179,6 +251,8 @@ extension/
 │   └── popup.js              # 弹窗逻辑
 ├── lib/
 │   ├── mail-api.js           # Gmail 无限别名生成器
+│   ├── email-service.js      # 临时邮箱服务（自动获取验证码）
+│   ├── captcha-service.js    # CAPTCHA 自动解决服务
 │   ├── oidc-api.js           # AWS OIDC 认证 API + Token 验证
 │   └── utils.js              # 工具函数（密码/姓名生成）
 └── icons/
@@ -210,10 +284,11 @@ graph TD
 ## ⚠️ 注意事项
 
 - ✅ **必须启用无痕模式权限**，否则无法创建无痕窗口
-- ✅ **必须配置 Gmail 地址**，用于生成邮箱别名
-- ⚠️ 验证码需要从 Gmail 收件箱手动获取并填写
-- ⚠️ 建议并发窗口设为 1，方便手动输入验证码
+- ✅ **Gmail 别名模式**：必须配置 Gmail 地址，验证码需手动填写
+- ✅ **临时邮箱模式**：必须配置邮箱服务，支持自动获取验证码
+- ⚠️ Gmail 别名模式建议并发窗口设为 1，临时邮箱模式支持更高并发
 - ⚠️ Token 默认状态为「未验证」，需手动点击「验证」按钮
+- ⚠️ CAPTCHA 服务需要 API Key（本地 Solver 除外）
 - 📱 仅支持 Chrome 浏览器（基于 Manifest V3）
 
 ---
@@ -233,14 +308,41 @@ graph TD
 </details>
 
 <details>
-<summary><b>❓ 提示"未配置 Gmail 地址"</b></summary>
+<summary><b>❓ 提示"未配置 Gmail 地址"或"临时邮箱配置不完整"</b></summary>
 
-**原因**：未在插件中配置 Gmail 地址
+**原因**：未在插件中配置邮箱服务
 
 **解决方案**：
 1. 点击插件图标打开弹窗
-2. 在「邮箱配置」区域输入你的 Gmail 地址
-3. 点击「保存」按钮
+2. 在「邮箱配置」区域选择模式：
+   - **Gmail 别名**：输入 Gmail 地址并保存
+   - **临时邮箱**：填写 Worker Domain、Email Domain、Admin Password 并保存
+3. 确认配置已保存（显示 ✓ 已保存）
+</details>
+
+<details>
+<summary><b>❓ 临时邮箱模式无法获取验证码</b></summary>
+
+**原因**：邮箱服务配置错误或服务不可用
+
+**解决方案**：
+1. 检查 Worker Domain、Email Domain、Admin Password 是否正确
+2. 确认邮箱服务正常运行（可以手动访问测试）
+3. 查看浏览器控制台（F12）的错误信息
+4. 尝试切换回 Gmail 别名模式
+</details>
+
+<details>
+<summary><b>❓ CAPTCHA 自动解决失败</b></summary>
+
+**原因**：CAPTCHA 服务配置错误或余额不足
+
+**解决方案**：
+1. 检查 API Key 是否正确
+2. 确认 CAPTCHA 服务账户余额充足
+3. 尝试切换其他服务商
+4. 如果使用本地 Solver，确认服务正常运行（访问 http://127.0.0.1:5072）
+5. 暂时禁用 CAPTCHA 自动解决，手动处理验证码
 </details>
 
 <details>
