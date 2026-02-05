@@ -847,11 +847,14 @@ async function getVerificationCode(session) {
         return { success: false, error: '等待验证码邮件超时' };
       }
 
-      // 提取验证码（AWS 验证码通常是 6 位数字）
-      const code = session.emailService.extractVerificationCode(emailContent, /\b\d{6}\b/);
+      // 打印邮件内容用于调试
+      console.log(`[Session ${session.id}] 邮件内容预览:`, emailContent.substring(0, 500));
+
+      // 提取验证码（使用改进后的智能匹配）
+      const code = session.emailService.extractVerificationCode(emailContent);
 
       if (!code) {
-        console.error(`[Session ${session.id}] 邮件内容中未找到验证码`);
+        console.error(`[Session ${session.id}] 邮件内容中未找到验证码，完整内容:`, emailContent);
         return { success: false, error: '邮件中未找到验证码' };
       }
 
