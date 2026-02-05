@@ -657,17 +657,9 @@ async function validateAllTokens() {
 /**
  * 开始批量注册
  */
-async function startBatchRegistration(loopCount, concurrency, config) {
+async function startBatchRegistration(loopCount, concurrency) {
   if (isRunning) {
     return { success: false, error: '已有注册任务在运行' };
-  }
-
-  // 更新服务配置
-  if (config.emailService) {
-    emailServiceConfig = { ...emailServiceConfig, ...config.emailService };
-  }
-  if (config.captchaService) {
-    captchaServiceConfig = { ...captchaServiceConfig, ...config.captchaService };
   }
 
   // 验证邮箱配置
@@ -911,7 +903,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'START_BATCH_REGISTRATION':
-      startBatchRegistration(message.loopCount || 1, message.concurrency || 1, message.config || {})
+      // 更新配置（从 popup 传递）
+      if (message.emailServiceConfig) {
+        emailServiceConfig = { ...emailServiceConfig, ...message.emailServiceConfig };
+      }
+      if (message.captchaServiceConfig) {
+        captchaServiceConfig = { ...captchaServiceConfig, ...message.captchaServiceConfig };
+      }
+      startBatchRegistration(message.loopCount || 1, message.concurrency || 1)
         .then(sendResponse);
       return true;
 

@@ -433,11 +433,21 @@ async function startRegistration() {
   const loopCount = parseInt(loopCountInput.value) || 1;
   const concurrency = parseInt(concurrencyInput.value) || 1;
 
-  // 检查 Gmail 是否已配置
-  if (!gmailAddress) {
-    alert('请先配置 Gmail 地址');
-    gmailAddressInput.focus();
-    return;
+  // 根据邮箱模式检查配置
+  if (emailServiceConfig.mode === 'gmail') {
+    // Gmail 别名模式：检查 Gmail 地址
+    if (!emailServiceConfig.gmailBaseAddress) {
+      alert('请先配置 Gmail 地址');
+      gmailAddressInput.focus();
+      return;
+    }
+  } else if (emailServiceConfig.mode === 'temp') {
+    // 临时邮箱模式：检查临时邮箱配置
+    const { workerDomain, emailDomain, adminPassword } = emailServiceConfig.tempEmail;
+    if (!workerDomain || !emailDomain || !adminPassword) {
+      alert('请先完成临时邮箱配置（Worker Domain、Email Domain、Admin Password）');
+      return;
+    }
   }
 
   // 验证输入
@@ -451,7 +461,7 @@ async function startRegistration() {
   }
 
   // Gmail 别名模式建议并发为 1
-  if (concurrency > 1) {
+  if (emailServiceConfig.mode === 'gmail' && concurrency > 1) {
     const confirm = window.confirm('使用 Gmail 别名模式时，建议并发设为 1（需要手动输入验证码）。\n\n是否继续？');
     if (!confirm) return;
   }
@@ -463,7 +473,8 @@ async function startRegistration() {
       type: 'START_BATCH_REGISTRATION',
       loopCount,
       concurrency,
-      gmailAddress  // 传递 Gmail 地址
+      emailServiceConfig,  // 传递完整的邮箱配置
+      captchaServiceConfig  // 传递 CAPTCHA 配置
     });
     console.log('[Popup] 注册响应:', response);
 
